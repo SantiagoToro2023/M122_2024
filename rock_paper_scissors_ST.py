@@ -23,31 +23,25 @@ while True:
         print('System has chosen: ' + SYSTEM_WEAPON)
         print('Its a tie!')
 
-    if USER_WEAPON == 'Rock':
-        if SYSTEM_WEAPON == 'Scissor':
-            user_win()
-        elif SYSTEM_WEAPON == 'Paper':
-            user_lose()
-        else:
-            user_tie()
 
-    elif USER_WEAPON == 'Paper':
-        if SYSTEM_WEAPON == 'Rock':
-            user_win()
-        elif SYSTEM_WEAPON == 'Scissor':
-            user_lose()
+    def determine_outcome(USER_WEAPON, SYSTEM_WEAPON):
+        if USER_WEAPON == SYSTEM_WEAPON:
+            user_tie(SYSTEM_WEAPON)
+        elif (USER_WEAPON == 'Rock' and SYSTEM_WEAPON == 'Scissor') or \
+                (USER_WEAPON == 'Paper' and SYSTEM_WEAPON == 'Rock') or \
+                (USER_WEAPON == 'Scissor' and SYSTEM_WEAPON == 'Paper'):
+            user_win(SYSTEM_WEAPON)
         else:
-            user_tie()
+            user_lose(SYSTEM_WEAPON)
 
-    elif USER_WEAPON == 'Scissor':
-        if SYSTEM_WEAPON == 'Paper':
-            user_win()
-        elif SYSTEM_WEAPON == 'Rock':
-            user_lose()
+
+    while True:
+        USER_WEAPON = input('Choose your weapon! (Rock, Paper or Scissor): ').capitalize()
+        SYSTEM_WEAPON = random.choice(WEAPONS)
+
+        if USER_WEAPON in WEAPONS:
+            determine_outcome(USER_WEAPON, SYSTEM_WEAPON)
         else:
-            user_tie()
-
-    else:
-        print('Invalid input you incompetent fool! Go back to first grade! You suck! 🤬🤬🤬🤬🤬')
-        print('*ᵁⁿˡᵉˢˢ ʸᵒᵘʳ ˢᵃⁿᵗᶦᵃᵍᵒ ᵀᵒʳᵒ ʰᵉˢ ᵏᵉʷˡ 😎')
-        break
+            print('Invalid input you incompetent fool! Go back to first grade! You suck! 🤬🤬🤬🤬🤬')
+            print('*ᵁⁿˡᵉˢˢ ʸᵒᵘʳ ˢᵃⁿᵗᶦᵃᵍᵒ ᵀᵒʳᵒ ʰᵉˢ ᵏᵉʷˡ 😎')
+            break
