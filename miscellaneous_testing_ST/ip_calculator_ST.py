@@ -2,7 +2,7 @@ import customtkinter as ctk
 import ipaddress
 import math
 
-# Set appearance and color theme
+# Set appearance and color theme 🐧🔷
 ctk.set_appearance_mode("System")
 ctk.set_default_color_theme("blue")
 
