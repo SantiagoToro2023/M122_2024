@@ -1,6 +1,6 @@
 import cv2
 
-def detect_faces(video_source=0, scaleFactor=1.1, minNeighbors=3, minSize=(10, 10)):
+def detect_faces(video_source=0, scaleFactor=1.1, minNeighbors=3, minSize=(10, 10), windowHeight=200, windowWidth=200):
     """
     Function to perform real-time face detection using a webcam.
     Author: Santiago Toro - M122
@@ -10,6 +10,8 @@ def detect_faces(video_source=0, scaleFactor=1.1, minNeighbors=3, minSize=(10, 1
         scaleFactor (float): Parameter specifying how much the image size is reduced at each image scale (default is 1.1).
         minNeighbors (int): Parameter specifying how many neighbors each candidate rectangle should have to retain it (default is 3).
         minSize (tuple): Minimum possible object size (default is (10, 10)).
+        windowHeight (int): Camera Window height (default is 200).
+        windowWidth (int): Camera Window width (default is 200).
     """
     # Load the Haar cascade file for face detection
     face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
@@ -18,8 +20,8 @@ def detect_faces(video_source=0, scaleFactor=1.1, minNeighbors=3, minSize=(10, 1
     vid = cv2.VideoCapture(video_source)
 
     # Set video frame width and height
-    vid.set(3, 200)  # Width
-    vid.set(4, 200)  # Height
+    vid.set(3, windowWidth )  # Width
+    vid.set(4, windowHeight )  # Height
 
     while True:
         ret, frame = vid.read()
