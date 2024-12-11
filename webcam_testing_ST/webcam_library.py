@@ -52,12 +52,15 @@ def detect_faces(video_source=0, scaleFactor=1.1, minNeighbors=3, minSize=(10, 1
     vid.release()
     cv2.destroyAllWindows()
 
-
-import cv2
-import os
-import numpy as np
-
-def recognize_faces(video_source=0, scaleFactor=1.1, minNeighbors=1, minSize=(5, 5), windowHeight=300, windowWidth=300, known_faces_dir="known_faces"):
+def recognize_faces(
+    video_source=0, 
+    scaleFactor=1.1,
+    minNeighbors=3,
+    minSize=(3, 3),
+    windowHeight=300, 
+    windowWidth=300, 
+    known_faces_dir="known_faces"
+):
     """
     Function to perform real-time face recognition using OpenCV.
 
@@ -104,10 +107,7 @@ def recognize_faces(video_source=0, scaleFactor=1.1, minNeighbors=1, minSize=(5,
     vid.set(3, windowWidth)  # Width
     vid.set(4, windowHeight)  # Height
 
-    print(f"Loading images from {person_path}")
-
-    # Confidence threshold for unknown faces
-    confidence_threshold = 90  # Adjust this based on your dataset
+    confidence_threshold = 90  # Confidence threshold for unknown faces
 
     while True:
         ret, frame = vid.read()
@@ -116,29 +116,37 @@ def recognize_faces(video_source=0, scaleFactor=1.1, minNeighbors=1, minSize=(5,
             break
 
         frame = cv2.flip(frame, 1)
-        # Convert the frame to grayscale for better detection
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
         # Detect faces in the frame
-        faces = face_cascade.detectMultiScale(gray, scaleFactor=scaleFactor, minNeighbors=minNeighbors, minSize=minSize)
+        detected_faces = face_cascade.detectMultiScale(
+            gray, scaleFactor=scaleFactor, minNeighbors=minNeighbors, minSize=minSize
+        )
 
-        for (x, y, w, h) in faces:
+        recognized_labels = set()  # To track already recognized labels in this frame
+
+        for (x, y, w, h) in detected_faces:
             face_roi = gray[y:y+h, x:x+w]
-            face_roi = cv2.resize(face_roi, (200, 200))  # Resize for LBPH recognizer
+            face_roi = cv2.resize(face_roi, (200, 200))
+
             label_id, confidence = recognizer.predict(face_roi)
 
-            # Determine the label and confidence
+            if label_id in recognized_labels:
+                # Skip if this label is already recognized
+                continue
+
             if confidence > confidence_threshold:
                 label_text = "Unknown"
                 color = (0, 0, 255)  # Red for unknown
             else:
                 label_text = labels.get(label_id, "Unknown")
+                recognized_labels.add(label_id)  # Mark this label as recognized
                 color = (0, 255, 0)  # Green for recognized
 
             # Draw rectangle and label
             cv2.rectangle(frame, (x, y), (x + w, y + h), color, 2)
             cv2.putText(frame, f"{label_text} ({int(confidence)})", (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
-
+            print(label_text, confidence)
         # Display the resulting frame
         cv2.imshow('Face Recognition', frame)
 
@@ -149,4 +157,3 @@ def recognize_faces(video_source=0, scaleFactor=1.1, minNeighbors=1, minSize=(5,
     # Release the video capture object and close all windows
     vid.release()
     cv2.destroyAllWindows()
-
