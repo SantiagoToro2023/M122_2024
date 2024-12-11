@@ -1,6 +1,7 @@
 import cv2
 import os
 import numpy as np
+from collections import defaultdict
 
 def detect_faces(video_source=0, scaleFactor=1.1, minNeighbors=3, minSize=(10, 10), windowHeight=200, windowWidth=200):
     """
@@ -52,31 +53,29 @@ def detect_faces(video_source=0, scaleFactor=1.1, minNeighbors=3, minSize=(10, 1
     vid.release()
     cv2.destroyAllWindows()
 
+
 def recognize_faces(
-    video_source=0, 
-    scaleFactor=1.1,
-    minNeighbors=3,
-    minSize=(3, 3),
-    windowHeight=300, 
-    windowWidth=300, 
-    known_faces_dir="known_faces"
+    video_source=0,
+    scaleFactor=1.2,
+    minNeighbors=4,
+    minSize=(5, 5),
+    windowHeight=750,
+    windowWidth=750,
+    known_faces_dir="known_faces",
+    consistency_threshold=45  # Number of frames required for consistent identification
 ):
     """
-    Function to perform real-time face recognition using OpenCV.
-
     Parameters:
         video_source (int or str): The video source (default is 0 for the webcam).
         scaleFactor (float): Parameter specifying how much the image size is reduced at each image scale (default is 1.1).
-        minNeighbors (int): Parameter specifying how many neighbors each candidate rectangle should have to retain it (default is 3).
+        minNeighbors (int): Parameter specifying how many neighbors are required. (default is 3).
         minSize (tuple): Minimum possible object size (default is (10, 10)).
         windowHeight (int): Camera Window height (default is 200).
         windowWidth (int): Camera Window width (default is 200).
         known_faces_dir (str): Directory containing subfolders for each person with labeled images.
+        consistency_threshold (int): Number of frames needed to validate identity.
     """
-    # Load the Haar cascade file for face detection
     face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
-
-    # Prepare the LBPH face recognizer
     recognizer = cv2.face.LBPHFaceRecognizer_create()
 
     # Load training data from known faces directory
@@ -100,14 +99,13 @@ def recognize_faces(
 
     recognizer.train(faces, np.array(face_labels))
 
-    # Open the video source
     vid = cv2.VideoCapture(video_source)
+    vid.set(3, windowWidth)
+    vid.set(4, windowHeight)
 
-    # Set video frame width and height
-    vid.set(3, windowWidth)  # Width
-    vid.set(4, windowHeight)  # Height
-
-    confidence_threshold = 90  # Confidence threshold for unknown faces
+    tracked_faces = defaultdict(lambda: {"label_id": -1, "count": 0, "frames_since_last_seen": 0})
+    max_frames_missed = 10
+    active_labels = set()
 
     while True:
         ret, frame = vid.read()
@@ -118,42 +116,74 @@ def recognize_faces(
         frame = cv2.flip(frame, 1)
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
-        # Detect faces in the frame
         detected_faces = face_cascade.detectMultiScale(
             gray, scaleFactor=scaleFactor, minNeighbors=minNeighbors, minSize=minSize
         )
 
-        recognized_labels = set()  # To track already recognized labels in this frame
+        current_tracked_ids = set()
+        active_labels.clear()
 
         for (x, y, w, h) in detected_faces:
             face_roi = gray[y:y+h, x:x+w]
             face_roi = cv2.resize(face_roi, (200, 200))
 
             label_id, confidence = recognizer.predict(face_roi)
+            face_center = (x + w // 2, y + h // 2)
 
-            if label_id in recognized_labels:
-                # Skip if this label is already recognized
-                continue
+            # Find the closest tracked face to associate with this detection
+            matched_id = None
+            for track_id, data in tracked_faces.items():
+                tracked_center = data["position"]
+                if np.linalg.norm(np.array(tracked_center) - np.array(face_center)) < max(w, h):
+                    matched_id = track_id
+                    break
 
-            if confidence > confidence_threshold:
-                label_text = "Unknown"
-                color = (0, 0, 255)  # Red for unknown
+            if matched_id is None:
+                matched_id = len(tracked_faces) + 1
+                tracked_faces[matched_id]["position"] = face_center
+
+            tracked_faces[matched_id]["position"] = face_center
+            tracked_faces[matched_id]["frames_since_last_seen"] = 0
+
+            if tracked_faces[matched_id]["label_id"] == label_id:
+                # Increment the consistency count if the label remains the same
+                tracked_faces[matched_id]["count"] += 1
             else:
-                label_text = labels.get(label_id, "Unknown")
-                recognized_labels.add(label_id)  # Mark this label as recognized
-                color = (0, 255, 0)  # Green for recognized
+                # Reset the count if the label changes
+                tracked_faces[matched_id]["label_id"] = label_id
+                tracked_faces[matched_id]["count"] = 1
 
-            # Draw rectangle and label
-            cv2.rectangle(frame, (x, y), (x + w, y + h), color, 2)
-            cv2.putText(frame, f"{label_text} ({int(confidence)})", (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
-            print(label_text, confidence)
+            # Draw the face bounding box and label if consistent enough and not already active
+            if (
+                tracked_faces[matched_id]["count"] >= consistency_threshold
+                and label_id not in active_labels
+            ):
+                final_label = labels.get(label_id, "Unknown")
+                color = (0, 255, 0) if final_label != "Unknown" else (0, 0, 255)
+                cv2.rectangle(frame, (x, y), (x + w, y + h), color, 2)
+                cv2.putText(
+                    frame, f"{final_label} ({int(confidence)})", (x, y - 10),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1
+                )
+                active_labels.add(label_id)  # Mark this label as active
+                print(final_label, confidence)
+
+            current_tracked_ids.add(matched_id)
+
+        # Update frames since last seen for all tracked faces
+        for track_id in list(tracked_faces.keys()):
+            if track_id not in current_tracked_ids:
+                tracked_faces[track_id]["frames_since_last_seen"] += 1
+
+                # Remove faces that haven't been seen for a while
+                if tracked_faces[track_id]["frames_since_last_seen"] > max_frames_missed:
+                    del tracked_faces[track_id]
+
         # Display the resulting frame
         cv2.imshow('Face Recognition', frame)
 
-        # Break the loop if 'q' is pressed
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
 
-    # Release the video capture object and close all windows
     vid.release()
     cv2.destroyAllWindows()
