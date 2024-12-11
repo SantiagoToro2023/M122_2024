@@ -115,6 +115,7 @@ def recognize_faces(video_source=0, scaleFactor=1.1, minNeighbors=1, minSize=(5,
             print("Failed to grab frame")
             break
 
+        frame = cv2.flip(frame, 1)
         # Convert the frame to grayscale for better detection
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
